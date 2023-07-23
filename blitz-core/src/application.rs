@@ -1,7 +1,7 @@
 use beuk::ash::vk::{self, PresentModeKHR};
 use beuk::ctx::{RenderContext, RenderContextDescriptor};
-use lyon::lyon_tessellation::{FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers};
-use peniko::Color;
+use beuk::memory::MemoryLocation;
+use epaint::{Primitive, TessellationOptions};
 use quadtree_rs::area::AreaBuilder;
 use quadtree_rs::Quadtree;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
@@ -13,7 +13,7 @@ use taffy::prelude::Layout;
 use tao::{dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use crate::lyon_renderer::LyonRenderer;
+use crate::renderer::{PushConstants, Renderer};
 use crate::style::Background;
 use crate::Driver;
 use crate::{
@@ -36,7 +36,7 @@ use taffy::{
 pub struct ApplicationState {
     dom: DomManager,
     render_context: RenderContext,
-    lyon_renderer: LyonRenderer,
+    lyon_renderer: Renderer,
     event_handler: BlitzEventHandler,
     quadtree: Quadtree<u64, NodeId>,
 }
@@ -71,7 +71,7 @@ impl ApplicationState {
             window_handle: window.raw_window_handle(),
             present_mode: PresentModeKHR::default(),
         });
-        let lyon_renderer = LyonRenderer::new(&mut render_context);
+        let lyon_renderer = Renderer::new(&mut render_context);
 
         ApplicationState {
             dom,
@@ -83,64 +83,9 @@ impl ApplicationState {
     }
 
     pub fn render(&mut self) {
-        self.lyon_renderer.fill_tessellator = FillTessellator::new();
-        self.lyon_renderer.geometry = VertexBuffers::new();
+        self.lyon_renderer.shapes.clear();
         self.dom.render(&mut self.lyon_renderer);
-        self.lyon_renderer.update_buffers(&mut self.render_context);
-
-        let present_index = self.render_context.acquire_present_index();
-        self.render_context.present_record(
-            present_index,
-            |ctx, command_buffer, present_index: u32| unsafe {
-                let color_attachments = &[vk::RenderingAttachmentInfo::default()
-                    .image_view(ctx.render_swapchain.present_image_views[present_index as usize])
-                    .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .load_op(vk::AttachmentLoadOp::CLEAR)
-                    .store_op(vk::AttachmentStoreOp::STORE)
-                    .clear_value(vk::ClearValue {
-                        color: vk::ClearColorValue {
-                            float32: [1.0, 1.0, 1.0, 1.0],
-                        },
-                    })];
-
-                ctx.begin_rendering(command_buffer, color_attachments, None);
-
-                let pipeline = ctx
-                    .pipeline_manager
-                    .get_graphics_pipeline(&self.lyon_renderer.pipeline_handle);
-                pipeline.bind(&ctx.device, command_buffer);
-                ctx.device.cmd_bind_vertex_buffers(
-                    command_buffer,
-                    0,
-                    std::slice::from_ref(
-                        &ctx.buffer_manager
-                            .get_buffer(self.lyon_renderer.vertex_buffer.unwrap())
-                            .buffer,
-                    ),
-                    &[0],
-                );
-                ctx.device.cmd_bind_index_buffer(
-                    command_buffer,
-                    ctx.buffer_manager
-                        .get_buffer(self.lyon_renderer.index_buffer.unwrap())
-                        .buffer,
-                    0,
-                    vk::IndexType::UINT16,
-                );
-                ctx.device.cmd_draw_indexed(
-                    command_buffer,
-                    self.lyon_renderer.geometry.indices.len() as u32,
-                    1,
-                    0,
-                    0,
-                    1,
-                );
-                ctx.end_rendering(command_buffer);
-            },
-        );
-
-        self.render_context.present_submit(present_index);
-
+        self.lyon_renderer.render(&mut self.render_context);
         // After we render, we need to update the quadtree to reflect the new positions of the nodes
         self.update_quadtree();
     }
@@ -452,7 +397,7 @@ impl DomManager {
         self.redraw_sender.send(()).unwrap();
     }
 
-    fn render(&self, renderer: &mut LyonRenderer) {
+    fn render(&self, renderer: &mut Renderer) {
         render(
             &self.rdom(),
             &self.taffy(),

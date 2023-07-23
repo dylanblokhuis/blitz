@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use taffy::prelude::Size;
 
-use crate::lyon_renderer::LyonRenderer;
+use crate::renderer::Renderer;
 use crate::util::map_dimension_percentage;
 use crate::util::translate_color;
 use crate::util::AngleExt;
@@ -233,7 +233,7 @@ impl Gradient {
 
     pub(crate) fn render(
         &self,
-        sb: &mut LyonRenderer,
+        sb: &mut Renderer,
         shape: &impl Shape,
         repeat: Repeat,
         rect: &Size<f32>,

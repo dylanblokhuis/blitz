@@ -1,6 +1,5 @@
 use dioxus_native_core::prelude::*;
-use lyon::geom::{point, Box2D};
-use lyon::lyon_tessellation::{BuffersBuilder, FillOptions};
+use epaint::{ClippedShape, Color32};
 use peniko::kurbo::{Affine, Point, Rect, RoundedRect, Vec2};
 use peniko::{Color, Fill, Stroke};
 use taffy::prelude::Layout;
@@ -10,8 +9,8 @@ use tao::dpi::PhysicalSize;
 
 use crate::focus::Focused;
 use crate::layout::TaffyLayout;
-use crate::lyon_renderer::{FillColor, LyonRenderer};
-use crate::style::{Background, Border};
+use crate::renderer::Renderer;
+use crate::style::{Background, Border, ForgroundColor};
 
 use crate::util::Resolve;
 use crate::util::{translate_color, Axis};
@@ -22,36 +21,32 @@ const FOCUS_BORDER_WIDTH: f64 = 6.0;
 pub(crate) fn render(
     dom: &RealDom,
     taffy: &Taffy,
-    lyon_renderer: &mut LyonRenderer,
+    renderer: &mut Renderer,
     window_size: PhysicalSize<u32>,
 ) {
     let root = &dom.get(dom.root_id()).unwrap();
-    let root_node = root.get::<TaffyLayout>().unwrap().node.unwrap();
-    let root_layout = taffy.layout(root_node).unwrap();
-    // let shape = Rect {
-    //     x0: root_layout.location.x.into(),
-    //     y0: root_layout.location.y.into(),
-    //     x1: (root_layout.location.x + root_layout.size.width).into(),
-    //     y1: (root_layout.location.y + root_layout.size.height).into(),
-    // };
-    let viewport_size = Size {
-        width: window_size.width,
-        height: window_size.height,
-    };
-    // lyon_renderer.rect(shape, Color::WHEAT, &viewport_size);
-    render_node(taffy, *root, lyon_renderer, Point::ZERO, &viewport_size);
+    render_node(
+        taffy,
+        *root,
+        renderer,
+        Point::ZERO,
+        &Size {
+            width: window_size.width,
+            height: window_size.height,
+        },
+    );
 }
 
 fn render_node(
     taffy: &Taffy,
     node: NodeRef,
-    lyon_renderer: &mut LyonRenderer,
+    renderer: &mut Renderer,
     location: Point,
     viewport_size: &Size<u32>,
 ) {
     let taffy_node = node.get::<TaffyLayout>().unwrap().node.unwrap();
     let layout = taffy.layout(taffy_node).unwrap();
-    let pos = location + Vec2::new(layout.location.x as f64, layout.location.y as f64);
+    let location = location + Vec2::new(layout.location.x as f64, layout.location.y as f64);
     match &*node.node_type() {
         NodeType::Text(TextNode { text, .. }) => {
             // let text_color = translate_color(&node.get::<ForgroundColor>().unwrap().0);
@@ -70,20 +65,11 @@ fn render_node(
             // )
         }
         NodeType::Element(_) => {
-            let shape = get_shape(layout, node, viewport_size, pos);
-
-            let background = node.get::<Background>().unwrap();
-
-            // let stroke = Stroke::new(node.get::<Border>().unwrap().width.top.resolve(
-            //     Axis::Min,
-            //     &layout.size,
-            //     viewport_size,
-            // ) as f32);
-            // lyon_renderer.stroke(shape.rect(), stroke, Color::BLACK, viewport_size);
-            lyon_renderer.rect(shape, background.color, viewport_size);
-
+            let shape = get_shape(layout, node, viewport_size, location);
+            let clip = shape.visual_bounding_rect();
+            renderer.shapes.push(ClippedShape(clip, shape));
             for child in node.children() {
-                render_node(taffy, child, lyon_renderer, pos, viewport_size);
+                render_node(taffy, child, renderer, location, viewport_size);
             }
         }
         _ => {}
@@ -95,7 +81,7 @@ pub(crate) fn get_shape(
     node: NodeRef,
     viewport_size: &Size<u32>,
     location: Point,
-) -> RoundedRect {
+) -> epaint::Shape {
     let axis = Axis::Min;
     let rect = layout.size;
     let x: f64 = location.x;
@@ -131,30 +117,54 @@ pub(crate) fn get_shape(
     let x_end = x + width - right_border_width / 2.0;
     let y_end = y + height - bottom_border_width / 2.0;
 
-    RoundedRect::new(
-        x_start,
-        y_start,
-        x_end,
-        y_end,
-        (
-            border.radius.top_left.0.resolve(axis, &rect, viewport_size),
-            border
+    let background = node.get::<Background>().unwrap();
+    let border_color = translate_color(&border.colors.bottom);
+
+    epaint::Shape::Rect(epaint::RectShape {
+        rect: epaint::Rect {
+            min: epaint::Pos2 {
+                x: x_start as f32,
+                y: y_start as f32,
+            },
+            max: epaint::Pos2 {
+                x: x_end as f32,
+                y: y_end as f32,
+            },
+        },
+        rounding: epaint::Rounding {
+            nw: border.radius.top_left.0.resolve(axis, &rect, viewport_size) as f32,
+            ne: border
                 .radius
                 .top_right
                 .0
-                .resolve(axis, &rect, viewport_size),
-            border
+                .resolve(axis, &rect, viewport_size) as f32,
+            se: border
                 .radius
                 .bottom_right
                 .0
-                .resolve(axis, &rect, viewport_size),
-            border
+                .resolve(axis, &rect, viewport_size) as f32,
+            sw: border
                 .radius
                 .bottom_left
                 .0
-                .resolve(axis, &rect, viewport_size),
+                .resolve(axis, &rect, viewport_size) as f32,
+        },
+        fill: Color32::from_rgba_unmultiplied(
+            background.color.r,
+            background.color.g,
+            background.color.b,
+            background.color.a,
         ),
-    )
+        stroke: epaint::Stroke {
+            width: border.width.top.resolve(axis, &rect, viewport_size) as f32,
+            color: Color32::from_rgba_premultiplied(
+                border_color.r,
+                border_color.g,
+                border_color.b,
+                border_color.a,
+            ),
+        },
+    })
 }
 
 pub(crate) fn get_abs_pos(layout: Layout, taffy: &Taffy, node: NodeRef) -> Point {

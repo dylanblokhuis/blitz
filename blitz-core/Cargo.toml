@@ -32,7 +32,6 @@ image = "0.24.5"
 quadtree_rs = "0.1.2"
 smallvec = "1.10.0"
 beuk = { git = "https://github.com/dylanblokhuis/beuk", version = "0.1.0" }
-lyon = "1.0.1"
 peniko = { git = "https://github.com/linebender/peniko" }
 bytemuck = { version = "1.13.1", features = ["derive"] }
-epaint = "0.22.0"
+epaint = { version = "0.22.0", features = ["bytemuck"] }

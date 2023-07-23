@@ -55,7 +55,11 @@ pub(crate) fn check_hovered(
         viewport_size,
         get_abs_pos(*node_layout, taffy, node),
     )
-    .contains(mouse_pos)
+    .visual_bounding_rect()
+    .contains(epaint::Pos2 {
+        x: mouse_pos.x as f32,
+        y: mouse_pos.y as f32,
+    })
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Component)]

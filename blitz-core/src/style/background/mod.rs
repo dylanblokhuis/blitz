@@ -18,7 +18,7 @@ use std::sync::Arc;
 use taffy::prelude::Layout;
 use taffy::prelude::Size;
 
-use crate::lyon_renderer::LyonRenderer;
+use crate::renderer::Renderer;
 use crate::util::translate_color;
 
 use self::gradient::Gradient;
@@ -47,7 +47,7 @@ impl Image {
 
     fn render(
         &self,
-        sb: &mut LyonRenderer,
+        sb: &mut Renderer,
         shape: &impl Shape,
         repeat: Repeat,
         rect: &Size<f32>,
@@ -122,7 +122,7 @@ pub(crate) struct Background {
 impl Background {
     pub(crate) fn draw_shape(
         &self,
-        sb: &mut LyonRenderer,
+        sb: &mut Renderer,
         shape: &impl Shape,
         rect: &Layout,
         viewport_size: &Size<u32>,

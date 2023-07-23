@@ -20,10 +20,10 @@ mod application;
 mod events;
 mod focus;
 mod layout;
-mod lyon_renderer;
 mod mouse;
 mod prevent_default;
 mod render;
+mod renderer;
 mod style;
 mod util;
 

@@ -6,6 +6,8 @@ async fn main() {
 }
 
 fn app(cx: Scope) -> Element {
+    let mut count = use_state(cx, || 0);
+
     cx.render(rsx! {
         div {
           background_color: "#ff0000",
@@ -20,8 +22,10 @@ fn app(cx: Scope) -> Element {
             height: "50px",
             margin: "15px",
             background_color: "#00ff00",
-            border_width: "0",
-            border_radius: "35px",
+            border_width: "{count}",
+            border_color: "#0000ff",
+            border_radius: "{count}",
+            onclick: move |_| count += 2
         }
         }
         div {
