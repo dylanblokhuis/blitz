@@ -4,11 +4,10 @@ use lightningcss::values::length::LengthPercentage;
 use lightningcss::values::length::LengthValue;
 use lightningcss::values::position::HorizontalPositionKeyword;
 use lightningcss::values::position::VerticalPositionKeyword;
-use peniko::kurbo::Affine;
-use peniko::kurbo::Point;
+
 use peniko::kurbo::Shape;
 use peniko::Color;
-use peniko::Extend;
+
 use smallvec::SmallVec;
 use std::f64::consts::PI;
 use std::sync::Arc;
@@ -233,11 +232,11 @@ impl Gradient {
 
     pub(crate) fn render(
         &self,
-        sb: &mut Renderer,
-        shape: &impl Shape,
-        repeat: Repeat,
-        rect: &Size<f32>,
-        viewport_size: &Size<u32>,
+        _sb: &mut Renderer,
+        _shape: &impl Shape,
+        _repeat: Repeat,
+        _rect: &Size<f32>,
+        _viewport_size: &Size<u32>,
     ) {
         // let stops = self.resolve_stops(rect, viewport_size);
         // let extend = if self.repeating {

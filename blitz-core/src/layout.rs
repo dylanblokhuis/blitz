@@ -41,7 +41,7 @@ impl State for TaffyLayout {
         // let text_context: &Arc<Mutex<TextContext>> = context.get().unwrap();
         let mut taffy = taffy.lock().unwrap();
         let mut changed = false;
-        if let Some(text) = node_view.text() {
+        if let Some(_text) = node_view.text() {
             // let mut text_context = text_context.lock().unwrap();
             // let font_size = fz.0;
             // let (width, height) = text_context.get_text_size(None, font_size, text);

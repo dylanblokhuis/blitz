@@ -1,28 +1,17 @@
-use std::f32::consts::PI;
 use std::mem::size_of;
 
 use beuk::ash::vk::{
-    self, BufferUsageFlags, DeviceSize, PipelineVertexInputStateCreateInfo, PushConstantRange,
-    ShaderStageFlags,
+    self, PipelineVertexInputStateCreateInfo, PushConstantRange, ShaderStageFlags,
 };
 use beuk::memory::MemoryLocation;
 use beuk::pipeline::BlendState;
 use beuk::{ctx::RenderContext, memory::PipelineHandle};
 use beuk::{
-    memory::BufferHandle,
     pipeline::{GraphicsPipelineDescriptor, PrimitiveState},
     shaders::Shader,
 };
-use dioxus_html::geometry::euclid::Vector2D;
-use epaint::{
-    ClippedPrimitive, ClippedShape, Color32, PathShape, Primitive, RectShape, TessellationOptions,
-    Tessellator,
-};
 
-use peniko::kurbo::RoundedRect;
-use peniko::{Color, Stroke};
-
-use crate::style::Border;
+use epaint::{Primitive, TessellationOptions};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]

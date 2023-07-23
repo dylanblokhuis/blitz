@@ -1,7 +1,7 @@
 use dioxus_native_core::prelude::*;
 use epaint::{ClippedShape, Color32};
-use peniko::kurbo::{Affine, Point, Rect, RoundedRect, Vec2};
-use peniko::{Color, Fill, Stroke};
+use peniko::kurbo::{Point, Vec2};
+
 use taffy::prelude::Layout;
 use taffy::prelude::Size;
 use taffy::Taffy;
@@ -10,7 +10,7 @@ use tao::dpi::PhysicalSize;
 use crate::focus::Focused;
 use crate::layout::TaffyLayout;
 use crate::renderer::Renderer;
-use crate::style::{Background, Border, ForgroundColor};
+use crate::style::{Background, Border};
 
 use crate::util::Resolve;
 use crate::util::{translate_color, Axis};
@@ -48,7 +48,7 @@ fn render_node(
     let layout = taffy.layout(taffy_node).unwrap();
     let location = location + Vec2::new(layout.location.x as f64, layout.location.y as f64);
     match &*node.node_type() {
-        NodeType::Text(TextNode { text, .. }) => {
+        NodeType::Text(TextNode { text: _, .. }) => {
             // let text_color = translate_color(&node.get::<ForgroundColor>().unwrap().0);
             // let font_size = if let Some(font_size) = node.get::<FontSize>() {
             //     font_size.0

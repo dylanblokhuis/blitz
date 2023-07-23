@@ -7,12 +7,12 @@ use dioxus_native_core_macro::partial_derive_state;
 use lightningcss::properties::background;
 use lightningcss::traits::Parse;
 use lightningcss::values::color::CssColor;
-use peniko::kurbo::Affine;
+
 use peniko::kurbo::Shape;
-use peniko::BrushRef;
+
 use peniko::Color;
 use peniko::Extend;
-use peniko::Fill;
+
 use shipyard::Component;
 use std::sync::Arc;
 use taffy::prelude::Layout;
@@ -32,7 +32,7 @@ pub(crate) enum Image {
 }
 
 impl Image {
-    fn try_create(value: lightningcss::values::image::Image, ctx: &SendAnyMap) -> Option<Self> {
+    fn try_create(value: lightningcss::values::image::Image, _ctx: &SendAnyMap) -> Option<Self> {
         use lightningcss::values::image;
         match value {
             image::Image::None => Some(Self::None),
@@ -47,11 +47,11 @@ impl Image {
 
     fn render(
         &self,
-        sb: &mut Renderer,
-        shape: &impl Shape,
-        repeat: Repeat,
-        rect: &Size<f32>,
-        viewport_size: &Size<u32>,
+        _sb: &mut Renderer,
+        _shape: &impl Shape,
+        _repeat: Repeat,
+        _rect: &Size<f32>,
+        _viewport_size: &Size<u32>,
     ) {
         // match self {
         //     Self::Gradient(gradient) => gradient.render(sb, shape, repeat, rect, viewport_size),
@@ -122,10 +122,10 @@ pub(crate) struct Background {
 impl Background {
     pub(crate) fn draw_shape(
         &self,
-        sb: &mut Renderer,
-        shape: &impl Shape,
-        rect: &Layout,
-        viewport_size: &Size<u32>,
+        _sb: &mut Renderer,
+        _shape: &impl Shape,
+        _rect: &Layout,
+        _viewport_size: &Size<u32>,
     ) {
         // First draw the background color
 
@@ -174,7 +174,7 @@ impl State for Background {
         _: <Self::NodeDependencies as Dependancy>::ElementBorrowed<'a>,
         _: Option<<Self::ParentDependencies as Dependancy>::ElementBorrowed<'a>>,
         _: Vec<<Self::ChildDependencies as Dependancy>::ElementBorrowed<'a>>,
-        ctx: &SendAnyMap,
+        _ctx: &SendAnyMap,
     ) -> bool {
         let mut new = Background::default();
         for attr in node_view.attributes().into_iter().flatten() {
@@ -195,7 +195,7 @@ impl State for Background {
                         }
                     }
                     "background-image" => {
-                        if let Ok(image) =
+                        if let Ok(_image) =
                             lightningcss::values::image::Image::parse_string(attr_value)
                         {
                             // new.image = Image::try_create(image, ctx).expect(
@@ -204,7 +204,8 @@ impl State for Background {
                         }
                     }
                     "background-repeat" => {
-                        if let Ok(repeat) = background::BackgroundRepeat::parse_string(attr_value) {
+                        if let Ok(_repeat) = background::BackgroundRepeat::parse_string(attr_value)
+                        {
                             // new.repeat = repeat.into();
                         }
                     }

@@ -1,7 +1,6 @@
-use beuk::ash::vk::{self, PresentModeKHR};
+use beuk::ash::vk::PresentModeKHR;
 use beuk::ctx::{RenderContext, RenderContextDescriptor};
-use beuk::memory::MemoryLocation;
-use epaint::{Primitive, TessellationOptions};
+
 use quadtree_rs::area::AreaBuilder;
 use quadtree_rs::Quadtree;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
@@ -13,7 +12,7 @@ use taffy::prelude::Layout;
 use tao::{dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use crate::renderer::{PushConstants, Renderer};
+use crate::renderer::Renderer;
 use crate::style::Background;
 use crate::Driver;
 use crate::{
