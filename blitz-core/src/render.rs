@@ -1,21 +1,18 @@
 use dioxus_native_core::prelude::*;
+use lyon::geom::{point, Box2D};
+use lyon::lyon_tessellation::{BuffersBuilder, FillOptions};
+use peniko::kurbo::{Affine, Point, Rect, RoundedRect, Vec2};
+use peniko::{Color, Fill, Stroke};
 use taffy::prelude::Layout;
 use taffy::prelude::Size;
 use taffy::Taffy;
 use tao::dpi::PhysicalSize;
-use vello::kurbo::{Affine, Point, Rect, RoundedRect, Vec2};
-use vello::peniko::{Color, Fill, Stroke};
-use vello::SceneBuilder;
 
 use crate::focus::Focused;
-use crate::image::LoadedImage;
 use crate::layout::TaffyLayout;
-use crate::style::Background;
-use crate::style::Border;
-use crate::style::ForgroundColor;
-use crate::text::FontSize;
-use crate::text::TextContext;
-use crate::text::DEFAULT_FONT_SIZE;
+use crate::lyon_renderer::{FillColor, LyonRenderer};
+use crate::style::{Background, Border};
+
 use crate::util::Resolve;
 use crate::util::{translate_color, Axis};
 use crate::RealDom;
@@ -25,39 +22,30 @@ const FOCUS_BORDER_WIDTH: f64 = 6.0;
 pub(crate) fn render(
     dom: &RealDom,
     taffy: &Taffy,
-    text_context: &mut TextContext,
-    scene_builder: &mut SceneBuilder,
+    lyon_renderer: &mut LyonRenderer,
     window_size: PhysicalSize<u32>,
 ) {
     let root = &dom.get(dom.root_id()).unwrap();
     let root_node = root.get::<TaffyLayout>().unwrap().node.unwrap();
     let root_layout = taffy.layout(root_node).unwrap();
-    let shape = Rect {
-        x0: root_layout.location.x.into(),
-        y0: root_layout.location.y.into(),
-        x1: (root_layout.location.x + root_layout.size.width).into(),
-        y1: (root_layout.location.y + root_layout.size.height).into(),
-    };
-    scene_builder.fill(Fill::NonZero, Affine::IDENTITY, Color::WHITE, None, &shape);
+    // let shape = Rect {
+    //     x0: root_layout.location.x.into(),
+    //     y0: root_layout.location.y.into(),
+    //     x1: (root_layout.location.x + root_layout.size.width).into(),
+    //     y1: (root_layout.location.y + root_layout.size.height).into(),
+    // };
     let viewport_size = Size {
         width: window_size.width,
         height: window_size.height,
     };
-    render_node(
-        taffy,
-        *root,
-        text_context,
-        scene_builder,
-        Point::ZERO,
-        &viewport_size,
-    );
+    // lyon_renderer.rect(shape, Color::WHEAT, &viewport_size);
+    render_node(taffy, *root, lyon_renderer, Point::ZERO, &viewport_size);
 }
 
 fn render_node(
     taffy: &Taffy,
     node: NodeRef,
-    text_context: &mut TextContext,
-    scene_builder: &mut SceneBuilder,
+    lyon_renderer: &mut LyonRenderer,
     location: Point,
     viewport_size: &Size<u32>,
 ) {
@@ -66,73 +54,36 @@ fn render_node(
     let pos = location + Vec2::new(layout.location.x as f64, layout.location.y as f64);
     match &*node.node_type() {
         NodeType::Text(TextNode { text, .. }) => {
-            let text_color = translate_color(&node.get::<ForgroundColor>().unwrap().0);
-            let font_size = if let Some(font_size) = node.get::<FontSize>() {
-                font_size.0
-            } else {
-                DEFAULT_FONT_SIZE
-            };
-            text_context.add(
-                scene_builder,
-                None,
-                font_size,
-                Some(text_color),
-                Affine::translate(pos.to_vec2() + Vec2::new(0.0, font_size as f64)),
-                text,
-            )
+            // let text_color = translate_color(&node.get::<ForgroundColor>().unwrap().0);
+            // let font_size = if let Some(font_size) = node.get::<FontSize>() {
+            //     font_size.0
+            // } else {
+            //     DEFAULT_FONT_SIZE
+            // };
+            // text_context.add(
+            //     scene_builder,
+            //     None,
+            //     font_size,
+            //     Some(text_color),
+            //     Affine::translate(pos.to_vec2() + Vec2::new(0.0, font_size as f64)),
+            //     text,
+            // )
         }
         NodeType::Element(_) => {
             let shape = get_shape(layout, node, viewport_size, pos);
 
             let background = node.get::<Background>().unwrap();
-            if node.get::<Focused>().filter(|focused| focused.0).is_some() {
-                let stroke_color = Color::rgb(1.0, 1.0, 1.0);
-                let stroke = Stroke::new(FOCUS_BORDER_WIDTH as f32 / 2.0);
-                scene_builder.stroke(&stroke, Affine::IDENTITY, stroke_color, None, &shape);
-                let smaller_rect = shape.rect().inset(-FOCUS_BORDER_WIDTH / 2.0);
-                let smaller_shape = RoundedRect::from_rect(smaller_rect, shape.radii());
-                let stroke_color = Color::rgb(0.0, 0.0, 0.0);
-                scene_builder.stroke(&stroke, Affine::IDENTITY, stroke_color, None, &shape);
-                background.draw_shape(scene_builder, &smaller_shape, layout, viewport_size);
-            } else {
-                let stroke_color = translate_color(&node.get::<Border>().unwrap().colors.top);
-                let stroke = Stroke::new(node.get::<Border>().unwrap().width.top.resolve(
-                    Axis::Min,
-                    &layout.size,
-                    viewport_size,
-                ) as f32);
-                scene_builder.stroke(&stroke, Affine::IDENTITY, stroke_color, None, &shape);
-                background.draw_shape(scene_builder, &shape, layout, viewport_size);
-            };
 
-            if let Some(image) = node
-                .get::<LoadedImage>()
-                .as_ref()
-                .and_then(|image| image.0.as_ref())
-            {
-                // Scale the image to fit the layout
-                let image_width = image.width as f64;
-                let image_height = image.height as f64;
-                let scale = Affine::scale_non_uniform(
-                    layout.size.width as f64 / image_width,
-                    layout.size.height as f64 / image_height,
-                );
-
-                // Translate the image to the layout's position
-                let translate = Affine::translate(pos.to_vec2());
-
-                scene_builder.draw_image(image, translate * scale);
-            }
+            // let stroke = Stroke::new(node.get::<Border>().unwrap().width.top.resolve(
+            //     Axis::Min,
+            //     &layout.size,
+            //     viewport_size,
+            // ) as f32);
+            // lyon_renderer.stroke(shape.rect(), stroke, Color::BLACK, viewport_size);
+            lyon_renderer.rect(shape, background.color, viewport_size);
 
             for child in node.children() {
-                render_node(
-                    taffy,
-                    child,
-                    text_context,
-                    scene_builder,
-                    pos,
-                    viewport_size,
-                );
+                render_node(taffy, child, lyon_renderer, pos, viewport_size);
             }
         }
         _ => {}

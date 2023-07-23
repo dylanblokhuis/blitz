@@ -31,7 +31,7 @@ impl FocusLevel {
         }
     }
 }
-
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
 impl PartialOrd for FocusLevel {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
@@ -164,7 +164,11 @@ impl FocusState {
         let focus_level = &mut self.focus_level;
         let mut next_focus = None;
 
+        println!("{:?}", "sdklfjsdf");
+
         loop {
+            println!("{:?}", "ddd");
+
             let new = if forward {
                 self.focus_iter.next(rdom)
             } else {

@@ -16,10 +16,8 @@ dioxus-native-core-macro = { git = "https://github.com/DioxusLabs/dioxus/" }
 dioxus-html = { git = "https://github.com/DioxusLabs/dioxus/" }
 taffy = "0.3.12"
 tokio = { version = "1.25.0", features = ["full"] }
-lightningcss = "1.0.0-alpha.39"
+lightningcss = { git = "https://github.com/parcel-bundler/lightningcss" }
 cssparser = "0.29.6"
-vello = { git = "https://github.com/linebender/vello", rev = "31f8d9ffa046d5c8cb2da8d99f24f65f00073215" }
-wgpu = "0.16"
 tao = { version = "0.17.0", features = ["serde"] }
 raw-window-handle = "0.5.0"
 anymap = "0.12.1"
@@ -33,9 +31,8 @@ once_cell = "1.17.1"
 image = "0.24.5"
 quadtree_rs = "0.1.2"
 smallvec = "1.10.0"
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-console_error_panic_hook = "0.1.7"
-console_log = "0.2.0"
-wasm-bindgen-futures = "0.4.33"
-web-sys = "0.3.60"
+beuk = { git = "https://github.com/dylanblokhuis/beuk", version = "0.1.0" }
+lyon = "1.0.1"
+peniko = { git = "https://github.com/linebender/peniko" }
+bytemuck = { version = "1.13.1", features = ["derive"] }
+epaint = "0.22.0"

@@ -1,4 +1,5 @@
 use keyboard_types::Code;
+use peniko::kurbo::Point;
 use quadtree_rs::Quadtree;
 use std::{
     any::Any,
@@ -9,7 +10,6 @@ use std::{
 };
 use taffy::{prelude::Size, Taffy};
 use tao::event::MouseButton;
-use vello::kurbo::Point;
 
 use dioxus_html::{
     events::{FocusData, KeyboardData, MouseData, WheelData},
@@ -206,10 +206,10 @@ impl BlitzEventHandler {
                                 });
                             }
                             if let Key::Tab = event.logical_key {
-                                self.state.focus_state.progress(
-                                    rdom,
-                                    !self.state.modifier_state.contains(Modifiers::SHIFT),
-                                );
+                                // self.state.focus_state.progress(
+                                //     rdom,
+                                //     !self.state.modifier_state.contains(Modifiers::SHIFT),
+                                // );
                                 return;
                             }
                         }

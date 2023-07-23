@@ -1,8 +1,8 @@
 use crate::util::Resolve;
 use lightningcss::values::gradient;
 use lightningcss::values::position::Position;
+use peniko::kurbo::Point;
 use taffy::prelude::Size;
-use vello::kurbo::Point;
 
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) struct RadialGradient {

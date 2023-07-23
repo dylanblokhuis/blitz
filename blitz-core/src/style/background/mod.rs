@@ -7,20 +7,18 @@ use dioxus_native_core_macro::partial_derive_state;
 use lightningcss::properties::background;
 use lightningcss::traits::Parse;
 use lightningcss::values::color::CssColor;
+use peniko::kurbo::Affine;
+use peniko::kurbo::Shape;
+use peniko::BrushRef;
+use peniko::Color;
+use peniko::Extend;
+use peniko::Fill;
 use shipyard::Component;
 use std::sync::Arc;
 use taffy::prelude::Layout;
 use taffy::prelude::Size;
-use vello::kurbo::Affine;
-use vello::kurbo::Shape;
-use vello::peniko;
-use vello::peniko::BrushRef;
-use vello::peniko::Color;
-use vello::peniko::Extend;
-use vello::peniko::Fill;
-use vello::SceneBuilder;
 
-use crate::image::ImageContext;
+use crate::lyon_renderer::LyonRenderer;
 use crate::util::translate_color;
 
 use self::gradient::Gradient;
@@ -29,7 +27,7 @@ use self::gradient::Gradient;
 pub(crate) enum Image {
     #[default]
     None,
-    Image(Arc<vello::peniko::Image>),
+    Image(Arc<peniko::Image>),
     Gradient(Gradient),
 }
 
@@ -38,10 +36,10 @@ impl Image {
         use lightningcss::values::image;
         match value {
             image::Image::None => Some(Self::None),
-            image::Image::Url(url) => {
-                let image_ctx: &ImageContext = ctx.get().expect("ImageContext not found");
-                Some(Self::Image(image_ctx.load_file(url.url.as_ref()).unwrap()))
-            }
+            // image::Image::Url(url) => {
+            //     let image_ctx: &ImageContext = ctx.get().expect("ImageContext not found");
+            //     Some(Self::Image(image_ctx.load_file(url.url.as_ref()).unwrap()))
+            // }
             image::Image::Gradient(gradient) => Some(Self::Gradient((*gradient).try_into().ok()?)),
             _ => None,
         }
@@ -49,39 +47,39 @@ impl Image {
 
     fn render(
         &self,
-        sb: &mut SceneBuilder,
+        sb: &mut LyonRenderer,
         shape: &impl Shape,
         repeat: Repeat,
         rect: &Size<f32>,
         viewport_size: &Size<u32>,
     ) {
-        match self {
-            Self::Gradient(gradient) => gradient.render(sb, shape, repeat, rect, viewport_size),
-            Self::Image(image) => {
-                // Translate the image to the layout's position
-                match repeat {
-                    Repeat { x: false, y: false } => {
-                        sb.fill(
-                            Fill::NonZero,
-                            Affine::IDENTITY,
-                            BrushRef::Image(image),
-                            None,
-                            &shape,
-                        );
-                    }
-                    _ => {
-                        sb.fill(
-                            Fill::NonZero,
-                            Affine::IDENTITY,
-                            BrushRef::Image(&(**image).clone().with_extend(peniko::Extend::Repeat)),
-                            None,
-                            &shape,
-                        );
-                    }
-                }
-            }
-            _ => {}
-        }
+        // match self {
+        //     Self::Gradient(gradient) => gradient.render(sb, shape, repeat, rect, viewport_size),
+        //     Self::Image(image) => {
+        //         // Translate the image to the layout's position
+        //         match repeat {
+        //             Repeat { x: false, y: false } => {
+        //                 sb.fill(
+        //                     Fill::NonZero,
+        //                     Affine::IDENTITY,
+        //                     BrushRef::Image(image),
+        //                     None,
+        //                     &shape,
+        //                 );
+        //             }
+        //             _ => {
+        //                 sb.fill(
+        //                     Fill::NonZero,
+        //                     Affine::IDENTITY,
+        //                     BrushRef::Image(&(**image).clone().with_extend(peniko::Extend::Repeat)),
+        //                     None,
+        //                     &shape,
+        //                 );
+        //             }
+        //         }
+        //     }
+        //     _ => {}
+        // }
     }
 }
 
@@ -117,29 +115,32 @@ impl From<Repeat> for Extend {
 #[derive(PartialEq, Debug, Component)]
 pub(crate) struct Background {
     pub color: Color,
-    pub image: Image,
-    pub repeat: Repeat,
+    // pub image: Image,
+    // pub repeat: Repeat,
 }
 
 impl Background {
     pub(crate) fn draw_shape(
         &self,
-        sb: &mut SceneBuilder,
+        sb: &mut LyonRenderer,
         shape: &impl Shape,
         rect: &Layout,
         viewport_size: &Size<u32>,
     ) {
         // First draw the background color
-        sb.fill(
-            peniko::Fill::NonZero,
-            Affine::IDENTITY,
-            self.color,
-            None,
-            &shape,
-        );
 
-        self.image
-            .render(sb, shape, self.repeat, &rect.size, viewport_size)
+        // let rect = shape.as_rect().unwrap();
+        // sb.rect(rect, self.color, viewport_size);
+        // sb.fill(
+        //     peniko::Fill::NonZero,
+        //     Affine::IDENTITY,
+        //     self.color,
+        //     None,
+        //     &shape,
+        // );
+
+        // self.image
+        //     .render(sb, shape, self.repeat, &rect.size, viewport_size)
     }
 }
 
@@ -147,8 +148,8 @@ impl Default for Background {
     fn default() -> Self {
         Background {
             color: Color::rgba8(255, 255, 255, 0),
-            image: Image::default(),
-            repeat: Repeat::default(),
+            // image: Image::default(),
+            // repeat: Repeat::default(),
         }
     }
 }
@@ -182,10 +183,10 @@ impl State for Background {
                     "background" => {
                         if let Ok(background) = background::Background::parse_string(attr_value) {
                             new.color = translate_color(&background.color);
-                            new.repeat = background.repeat.into();
-                            new.image = Image::try_create(background.image, ctx).expect(
-                                "attempted to convert a background Blitz does not support yet",
-                            );
+                            // new.repeat = background.repeat.into();
+                            // new.image = Image::try_create(background.image, ctx).expect(
+                            //     "attempted to convert a background Blitz does not support yet",
+                            // );
                         }
                     }
                     "background-color" => {
@@ -197,14 +198,14 @@ impl State for Background {
                         if let Ok(image) =
                             lightningcss::values::image::Image::parse_string(attr_value)
                         {
-                            new.image = Image::try_create(image, ctx).expect(
-                                "attempted to convert a background Blitz does not support yet",
-                            );
+                            // new.image = Image::try_create(image, ctx).expect(
+                            //     "attempted to convert a background Blitz does not support yet",
+                            // );
                         }
                     }
                     "background-repeat" => {
                         if let Ok(repeat) = background::BackgroundRepeat::parse_string(attr_value) {
-                            new.repeat = repeat.into();
+                            // new.repeat = repeat.into();
                         }
                     }
 

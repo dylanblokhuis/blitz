@@ -1,5 +1,10 @@
+use beuk::ash::vk::{self, PresentModeKHR};
+use beuk::ctx::{RenderContext, RenderContextDescriptor};
+use lyon::lyon_tessellation::{FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers};
+use peniko::Color;
 use quadtree_rs::area::AreaBuilder;
 use quadtree_rs::Quadtree;
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use rustc_hash::FxHashSet;
 use shipyard::Component;
 use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockWriteGuard};
@@ -7,26 +12,20 @@ use taffy::geometry::Point;
 use taffy::prelude::Layout;
 use tao::{dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use vello::{
-    peniko::Color,
-    util::{RenderContext, RenderSurface},
-    RenderParams, Scene, SceneBuilder,
-};
-use vello::{Renderer as VelloRenderer, RendererOptions};
 
+use crate::lyon_renderer::LyonRenderer;
+use crate::style::Background;
+use crate::Driver;
 use crate::{
     events::{BlitzEventHandler, DomEvent},
     focus::{Focus, FocusState},
-    image::LoadedImage,
     layout::TaffyLayout,
     mouse::MouseEffected,
     prevent_default::PreventDefault,
     render::render,
-    style::{Background, Border, ForgroundColor},
-    text::{FontSize, TextContext},
+    style::{Border, ForgroundColor},
     Redraw, TaoEvent,
 };
-use crate::{image::ImageContext, Driver};
 use dioxus_native_core::{prelude::*, FxDashSet};
 use taffy::{
     prelude::{AvailableSpace, Size},
@@ -36,10 +35,8 @@ use taffy::{
 
 pub struct ApplicationState {
     dom: DomManager,
-    text_context: TextContext,
     render_context: RenderContext,
-    surface: RenderSurface,
-    wgpu_renderer: VelloRenderer,
+    lyon_renderer: LyonRenderer,
     event_handler: BlitzEventHandler,
     quadtree: Quadtree<u64, NodeId>,
 }
@@ -61,8 +58,6 @@ impl ApplicationState {
             Border::to_type_erased(),
             Focus::to_type_erased(),
             PreventDefault::to_type_erased(),
-            LoadedImage::to_type_erased(),
-            FontSize::to_type_erased(),
         ]);
 
         let focus_state = FocusState::create(&mut rdom);
@@ -71,61 +66,80 @@ impl ApplicationState {
 
         let event_handler = BlitzEventHandler::new(focus_state);
 
-        let mut render_context = RenderContext::new().unwrap();
-        let size = window.inner_size();
-        let surface = render_context
-            .create_surface(window, size.width, size.height)
-            .await
-            .expect("Error creating surface");
-        let wgpu_renderer = VelloRenderer::new(
-            &render_context.devices[surface.dev_id].device,
-            &RendererOptions {
-                surface_format: Some(surface.config.format),
-                timestamp_period: render_context.devices[surface.dev_id]
-                    .queue
-                    .get_timestamp_period(),
-            },
-        )
-        .unwrap();
-
-        let text_context = TextContext::default();
+        let mut render_context = RenderContext::new(RenderContextDescriptor {
+            display_handle: window.raw_display_handle(),
+            window_handle: window.raw_window_handle(),
+            present_mode: PresentModeKHR::default(),
+        });
+        let lyon_renderer = LyonRenderer::new(&mut render_context);
 
         ApplicationState {
             dom,
-            text_context,
             render_context,
-            wgpu_renderer,
-            surface,
+            lyon_renderer,
             event_handler,
             quadtree: Quadtree::new(20),
         }
     }
 
     pub fn render(&mut self) {
-        let mut scene = Scene::new();
-        let mut builder = SceneBuilder::for_scene(&mut scene);
-        self.dom.render(&mut self.text_context, &mut builder);
-        let surface_texture = self
-            .surface
-            .surface
-            .get_current_texture()
-            .expect("failed to get surface texture");
-        let device = &self.render_context.devices[self.surface.dev_id];
-        self.wgpu_renderer
-            .render_to_surface(
-                &device.device,
-                &device.queue,
-                &scene,
-                &surface_texture,
-                &RenderParams {
-                    base_color: Color::WHITE,
-                    width: self.surface.config.width,
-                    height: self.surface.config.height,
-                },
-            )
-            .expect("failed to render to surface");
-        surface_texture.present();
-        device.device.poll(wgpu::Maintain::Wait);
+        self.lyon_renderer.fill_tessellator = FillTessellator::new();
+        self.lyon_renderer.geometry = VertexBuffers::new();
+        self.dom.render(&mut self.lyon_renderer);
+        self.lyon_renderer.update_buffers(&mut self.render_context);
+
+        let present_index = self.render_context.acquire_present_index();
+        self.render_context.present_record(
+            present_index,
+            |ctx, command_buffer, present_index: u32| unsafe {
+                let color_attachments = &[vk::RenderingAttachmentInfo::default()
+                    .image_view(ctx.render_swapchain.present_image_views[present_index as usize])
+                    .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .load_op(vk::AttachmentLoadOp::CLEAR)
+                    .store_op(vk::AttachmentStoreOp::STORE)
+                    .clear_value(vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [1.0, 1.0, 1.0, 1.0],
+                        },
+                    })];
+
+                ctx.begin_rendering(command_buffer, color_attachments, None);
+
+                let pipeline = ctx
+                    .pipeline_manager
+                    .get_graphics_pipeline(&self.lyon_renderer.pipeline_handle);
+                pipeline.bind(&ctx.device, command_buffer);
+                ctx.device.cmd_bind_vertex_buffers(
+                    command_buffer,
+                    0,
+                    std::slice::from_ref(
+                        &ctx.buffer_manager
+                            .get_buffer(self.lyon_renderer.vertex_buffer.unwrap())
+                            .buffer,
+                    ),
+                    &[0],
+                );
+                ctx.device.cmd_bind_index_buffer(
+                    command_buffer,
+                    ctx.buffer_manager
+                        .get_buffer(self.lyon_renderer.index_buffer.unwrap())
+                        .buffer,
+                    0,
+                    vk::IndexType::UINT16,
+                );
+                ctx.device.cmd_draw_indexed(
+                    command_buffer,
+                    self.lyon_renderer.geometry.indices.len() as u32,
+                    1,
+                    0,
+                    0,
+                    1,
+                );
+                ctx.end_rendering(command_buffer);
+            },
+        );
+
+        self.render_context.present_submit(present_index);
 
         // After we render, we need to update the quadtree to reflect the new positions of the nodes
         self.update_quadtree();
@@ -212,8 +226,8 @@ impl ApplicationState {
         // the window size is zero when minimized which causes the renderer to panic
         if size.width > 0 && size.height > 0 {
             self.dom.set_size(size);
-            self.render_context
-                .resize_surface(&mut self.surface, size.width, size.height);
+            // self.render_context
+            //     .resize_surface(&mut self.surface, size.width, size.height);
         }
     }
 
@@ -250,10 +264,8 @@ async fn spawn_dom<R: Driver>(
     mut redraw_receiver: UnboundedReceiver<()>,
     vdom_dirty: Arc<FxDashSet<NodeId>>,
 ) -> Option<()> {
-    let text_context = Arc::new(Mutex::new(TextContext::default()));
     let mut renderer = spawn_renderer(&rdom, &taffy);
     let mut last_size;
-    let image_context = ImageContext::default();
 
     // initial render
     {
@@ -262,8 +274,6 @@ async fn spawn_dom<R: Driver>(
         renderer.update(rdom.get_mut(root_id)?);
         let mut ctx = SendAnyMap::new();
         ctx.insert(taffy.clone());
-        ctx.insert(image_context.clone());
-        ctx.insert(text_context.clone());
         // update the state of the real dom
         let (to_rerender, _) = rdom.update_state(ctx);
         let size = size.lock().unwrap();
@@ -315,7 +325,6 @@ async fn spawn_dom<R: Driver>(
 
         let mut ctx = SendAnyMap::new();
         ctx.insert(taffy.clone());
-        ctx.insert(text_context.clone());
 
         // update the real dom
         let (to_rerender, _) = rdom.update_state(ctx);
@@ -443,11 +452,10 @@ impl DomManager {
         self.redraw_sender.send(()).unwrap();
     }
 
-    fn render(&self, text_context: &mut TextContext, renderer: &mut SceneBuilder) {
+    fn render(&self, renderer: &mut LyonRenderer) {
         render(
             &self.rdom(),
             &self.taffy(),
-            text_context,
             renderer,
             *self.size.lock().unwrap(),
         );

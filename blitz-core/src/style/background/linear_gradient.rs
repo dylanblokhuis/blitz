@@ -1,6 +1,6 @@
+use peniko::kurbo::Point;
 use std::f64::consts::PI;
 use taffy::prelude::Size;
-use vello::kurbo::Point;
 
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) struct LinearGradient {

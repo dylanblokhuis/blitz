@@ -4,19 +4,18 @@ use lightningcss::values::length::LengthPercentage;
 use lightningcss::values::length::LengthValue;
 use lightningcss::values::position::HorizontalPositionKeyword;
 use lightningcss::values::position::VerticalPositionKeyword;
+use peniko::kurbo::Affine;
+use peniko::kurbo::Point;
+use peniko::kurbo::Shape;
+use peniko::Color;
+use peniko::Extend;
 use smallvec::SmallVec;
 use std::f64::consts::PI;
 use std::sync::Arc;
 use std::sync::Mutex;
 use taffy::prelude::Size;
-use vello::kurbo::Affine;
-use vello::kurbo::Point;
-use vello::kurbo::Shape;
-use vello::peniko;
-use vello::peniko::Color;
-use vello::peniko::Extend;
-use vello::SceneBuilder;
 
+use crate::lyon_renderer::LyonRenderer;
 use crate::util::map_dimension_percentage;
 use crate::util::translate_color;
 use crate::util::AngleExt;
@@ -234,80 +233,80 @@ impl Gradient {
 
     pub(crate) fn render(
         &self,
-        sb: &mut SceneBuilder,
+        sb: &mut LyonRenderer,
         shape: &impl Shape,
         repeat: Repeat,
         rect: &Size<f32>,
         viewport_size: &Size<u32>,
     ) {
-        let stops = self.resolve_stops(rect, viewport_size);
-        let extend = if self.repeating {
-            Extend::Repeat
-        } else {
-            repeat.into()
-        };
-        match &self.gradient_type {
-            GradientType::Linear(gradient) => {
-                let bb = shape.bounding_box();
-                let starting_point_offset = gradient.center_offset(*rect);
-                let ending_point_offset =
-                    Point::new(-starting_point_offset.x, -starting_point_offset.y);
-                let center = bb.center();
-                let start = Point::new(
-                    center.x + starting_point_offset.x,
-                    center.y + starting_point_offset.y,
-                );
-                let end = Point::new(
-                    center.x + ending_point_offset.x,
-                    center.y + ending_point_offset.y,
-                );
+        // let stops = self.resolve_stops(rect, viewport_size);
+        // let extend = if self.repeating {
+        //     Extend::Repeat
+        // } else {
+        //     repeat.into()
+        // };
+        // match &self.gradient_type {
+        //     GradientType::Linear(gradient) => {
+        //         let bb = shape.bounding_box();
+        //         let starting_point_offset = gradient.center_offset(*rect);
+        //         let ending_point_offset =
+        //             Point::new(-starting_point_offset.x, -starting_point_offset.y);
+        //         let center = bb.center();
+        //         let start = Point::new(
+        //             center.x + starting_point_offset.x,
+        //             center.y + starting_point_offset.y,
+        //         );
+        //         let end = Point::new(
+        //             center.x + ending_point_offset.x,
+        //             center.y + ending_point_offset.y,
+        //         );
 
-                let kind = peniko::GradientKind::Linear { start, end };
+        //         let kind = peniko::GradientKind::Linear { start, end };
 
-                let gradient = peniko::Gradient {
-                    kind,
-                    extend,
-                    stops: (*stops).clone(),
-                };
+        //         let gradient = peniko::Gradient {
+        //             kind,
+        //             extend,
+        //             stops: (*stops).clone(),
+        //         };
 
-                let brush = peniko::BrushRef::Gradient(&gradient);
+        //         let brush = peniko::BrushRef::Gradient(&gradient);
 
-                sb.fill(peniko::Fill::NonZero, Affine::IDENTITY, brush, None, shape)
-            }
-            GradientType::Radial(gradient) => {
-                let bb = shape.bounding_box();
-                let pos_x = bb.x0
-                    + gradient
-                        .position
-                        .x
-                        .resolve(crate::util::Axis::X, rect, viewport_size);
-                let pos_y = bb.y0
-                    + gradient
-                        .position
-                        .y
-                        .resolve(crate::util::Axis::Y, rect, viewport_size);
-                let pos = Point::new(pos_x, pos_y);
+        //         sb.fill(peniko::Fill::NonZero, Affine::IDENTITY, brush, None, shape)
+        //     }
+        //     GradientType::Radial(gradient) => {
+        //         let bb = shape.bounding_box();
+        //         let pos_x = bb.x0
+        //             + gradient
+        //                 .position
+        //                 .x
+        //                 .resolve(crate::util::Axis::X, rect, viewport_size);
+        //         let pos_y = bb.y0
+        //             + gradient
+        //                 .position
+        //                 .y
+        //                 .resolve(crate::util::Axis::Y, rect, viewport_size);
+        //         let pos = Point::new(pos_x, pos_y);
 
-                let end_radius = gradient.radius_in(pos, rect, viewport_size) as f32;
+        //         let end_radius = gradient.radius_in(pos, rect, viewport_size) as f32;
 
-                let kind = peniko::GradientKind::Radial {
-                    start_center: pos,
-                    start_radius: 0.0,
-                    end_center: pos,
-                    end_radius,
-                };
+        //         let kind = peniko::GradientKind::Radial {
+        //             start_center: pos,
+        //             start_radius: 0.0,
+        //             end_center: pos,
+        //             end_radius,
+        //         };
 
-                let gradient = peniko::Gradient {
-                    kind,
-                    extend,
-                    stops: (*stops).clone(),
-                };
+        //         let gradient = peniko::Gradient {
+        //             kind,
+        //             extend,
+        //             stops: (*stops).clone(),
+        //         };
 
-                let brush = peniko::BrushRef::Gradient(&gradient);
+        //         let brush = peniko::BrushRef::Gradient(&gradient);
 
-                sb.fill(peniko::Fill::NonZero, Affine::IDENTITY, brush, None, shape)
-            }
-            GradientType::Conic => todo!(),
-        }
+        //         sb.fill(peniko::Fill::NonZero, Affine::IDENTITY, brush, None, shape)
+        //     }
+        //     GradientType::Conic => todo!(),
+        // }
     }
 }

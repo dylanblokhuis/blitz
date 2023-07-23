@@ -19,13 +19,12 @@ pub use crate::events::EventData;
 mod application;
 mod events;
 mod focus;
-mod image;
 mod layout;
+mod lyon_renderer;
 mod mouse;
 mod prevent_default;
 mod render;
 mod style;
-mod text;
 mod util;
 
 type TaoEvent<'a> = Event<'a, Redraw>;
@@ -42,9 +41,9 @@ pub async fn render<R: Driver>(
 ) {
     let event_loop = EventLoop::with_user_event();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
-    let mut appliction =
+    let mut application =
         ApplicationState::new(spawn_renderer, &window, event_loop.create_proxy()).await;
-    appliction.render();
+    application.render();
 
     event_loop.run(move |event, _, control_flow| {
         // ControlFlow::Wait pauses the event loop if no events are available to process.
@@ -52,7 +51,7 @@ pub async fn render<R: Driver>(
         // input, and uses significantly less power/CPU time than ControlFlow::Poll.
         *control_flow = ControlFlow::Wait;
 
-        appliction.send_event(&event);
+        application.send_event(&event);
 
         match event {
             Event::WindowEvent {
@@ -76,8 +75,8 @@ pub async fn render<R: Driver>(
                 // this event rather than in MainEventsCleared, since rendering in here allows
                 // the program to gracefully handle redraws requested by the OS.
 
-                if !appliction.clean().is_empty() {
-                    appliction.render();
+                if !application.clean().is_empty() {
+                    application.render();
                 }
             }
             Event::UserEvent(_redraw) => {
@@ -88,7 +87,7 @@ pub async fn render<R: Driver>(
                 window_id: _,
                 ..
             } => {
-                appliction.set_size(physical_size);
+                application.set_size(physical_size);
             }
             _ => (),
         }

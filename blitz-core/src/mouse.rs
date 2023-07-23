@@ -1,11 +1,11 @@
 use dioxus_native_core::prelude::*;
 use dioxus_native_core_macro::partial_derive_state;
 use once_cell::sync::Lazy;
+use peniko::kurbo::{Point, Shape};
 use quadtree_rs::{area::AreaBuilder, Quadtree};
 use rustc_hash::FxHashSet;
 use shipyard::Component;
 use taffy::{prelude::Size, Taffy};
-use vello::kurbo::{Point, Shape};
 
 use crate::{
     layout::TaffyLayout,
